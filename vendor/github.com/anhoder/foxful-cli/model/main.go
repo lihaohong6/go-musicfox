@@ -145,7 +145,10 @@ func (m *Main) Update(msg tea.Msg, a *App) (Page, tea.Cmd) {
 		}
 
 		if m.isDualColumn {
-			m.menuStartColumn = (msg.Width - 60) / 2
+			m.menuStartColumn = (msg.Width - 80) / 2
+			if m.menuStartColumn < 5 {
+				m.menuStartColumn = 5
+			}
 			m.menuBottomRow = m.menuStartRow + int(math.Ceil(float64(m.menuPageSize)/2)) + 1 // 1 for search bar
 		} else {
 			m.menuStartColumn = (msg.Width - 20) / 2
@@ -453,17 +456,9 @@ func (m *Main) menuItemView(a *App, index int) (string, int) {
 	}
 
 	if m.isDualColumn {
-		if windowWidth <= 88 {
-			itemMaxLen = (windowWidth - m.menuStartColumn - 4) / 2
-		} else {
-			if index%2 == 0 {
-				itemMaxLen = 44
-			} else {
-				itemMaxLen = windowWidth - m.menuStartColumn - 44
-			}
-		}
+		itemMaxLen = (windowWidth - m.menuStartColumn * 2 + 6) / 2
 	} else {
-		itemMaxLen = windowWidth - m.menuStartColumn
+		itemMaxLen = windowWidth - m.menuStartColumn * 2
 	}
 
 	menuTitleLen := runewidth.StringWidth(menuTitle)
