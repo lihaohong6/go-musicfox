@@ -2,17 +2,15 @@ package model
 
 import (
 	"fmt"
-	"math"
-	"strconv"
-	"strings"
-	"time"
-	"unicode/utf8"
-
 	"github.com/anhoder/foxful-cli/util"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattn/go-runewidth"
 	"github.com/muesli/termenv"
+	"math"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type Main struct {
@@ -258,6 +256,10 @@ func (m *Main) IsDualColumn() bool {
 	return m.isDualColumn
 }
 
+func (m *Main) CenterEverything() bool {
+	return m.options.CenterEverything
+}
+
 func (m *Main) MenuTitle() *MenuItem {
 	return m.menuTitle
 }
@@ -288,7 +290,7 @@ func (m *Main) TitleView(a *App, top *int) string {
 		titleBuilder strings.Builder
 		windowWidth  = a.WindowWidth()
 	)
-	titleLen := utf8.RuneCountInString(m.options.AppName) + 2
+	titleLen := runewidth.StringWidth(m.options.AppName)
 	prefixLen := (windowWidth - titleLen) / 2
 	suffixLen := windowWidth - prefixLen - titleLen
 	if prefixLen > 0 {
@@ -319,30 +321,41 @@ func (m *Main) MenuTitleView(a *App, top *int, menuTitle *MenuItem) string {
 		menuTitle = m.menuTitle
 	}
 
-	realString := menuTitle.OriginString()
-	formatString := menuTitle.String()
-	if runewidth.StringWidth(realString) > maxLen {
-		menuTmp := *menuTitle
-		titleLen := runewidth.StringWidth(menuTmp.Title)
-		subTitleLen := runewidth.StringWidth(menuTmp.Subtitle)
-		if titleLen >= maxLen-1 {
-			menuTmp.Title = runewidth.Truncate(menuTmp.Title, maxLen-1, "")
-			menuTmp.Subtitle = ""
-		} else if subTitleLen >= maxLen-titleLen-1 {
-			menuTmp.Subtitle = runewidth.Truncate(menuTmp.Subtitle, maxLen-titleLen-1, "")
-		}
-		title = menuTmp.String()
-	} else {
-		formatLen := runewidth.StringWidth(formatString)
-		realLen := runewidth.StringWidth(realString)
-		title = runewidth.FillRight(menuTitle.String(), maxLen+formatLen-realLen)
-	}
-
 	if top != nil && m.menuTitleStartRow-*top > 0 {
 		menuTitleBuilder.WriteString(strings.Repeat("\n", m.menuTitleStartRow-*top))
 	}
-	if m.menuTitleStartColumn > 0 {
-		menuTitleBuilder.WriteString(strings.Repeat(" ", m.menuTitleStartColumn))
+
+	realString := menuTitle.OriginString()
+	formatString := menuTitle.String()
+	if m.options.CenterEverything {
+		stringLen := runewidth.StringWidth(realString)
+		if stringLen >= windowWidth {
+			title = runewidth.Truncate(formatString, windowWidth, "")
+		} else {
+			spaceLeft := (windowWidth - stringLen) / 2
+			spaceRight := windowWidth - spaceLeft - stringLen
+			title = strings.Repeat(" ", spaceLeft) + formatString + strings.Repeat(" ", spaceRight)
+		}
+	} else {
+		if runewidth.StringWidth(realString) > maxLen {
+			menuTmp := *menuTitle
+			titleLen := runewidth.StringWidth(menuTmp.Title)
+			subTitleLen := runewidth.StringWidth(menuTmp.Subtitle)
+			if titleLen >= maxLen-1 {
+				menuTmp.Title = runewidth.Truncate(menuTmp.Title, maxLen-1, "")
+				menuTmp.Subtitle = ""
+			} else if subTitleLen >= maxLen-titleLen-1 {
+				menuTmp.Subtitle = runewidth.Truncate(menuTmp.Subtitle, maxLen-titleLen-1, "")
+			}
+			title = menuTmp.String()
+		} else {
+			formatLen := runewidth.StringWidth(formatString)
+			realLen := runewidth.StringWidth(realString)
+			title = runewidth.FillRight(menuTitle.String(), maxLen+formatLen-realLen)
+		}
+		if m.menuTitleStartColumn > 0 {
+			menuTitleBuilder.WriteString(strings.Repeat(" ", m.menuTitleStartColumn))
+		}
 	}
 	menuTitleBuilder.WriteString(util.SetFgStyle(title, termenv.ANSIBrightGreen))
 
@@ -355,6 +368,145 @@ func (m *Main) MenuTitleView(a *App, top *int, menuTitle *MenuItem) string {
 
 func (m *Main) MenuList() []MenuItem {
 	return m.menuList
+}
+
+func (m *Main) getNumColumns() int {
+	if m.options.DualColumn {
+		return 2
+	}
+	return 1
+}
+
+func (m *Main) forceEntryLength(item *MenuItem, targetLength int) string {
+	// Case 1:
+	// Only enough space for the main title. Not enough width for subtitle.
+	titleWidth := runewidth.StringWidth(item.Title)
+	minSubtitleWidth := 5
+	if titleWidth >= targetLength-minSubtitleWidth {
+		title := runewidth.Truncate(item.Title, targetLength, "")
+		return runewidth.FillRight(title, targetLength)
+	}
+	// Case 2:
+	// Enough space for everything.
+	fullWidth := runewidth.StringWidth(item.OriginString())
+	if fullWidth <= targetLength {
+		return item.String() + strings.Repeat(" ", targetLength-fullWidth)
+	}
+	// Case 3:
+	// Enough space for main title. Need to scroll subtitle.
+	subtitleSpace := targetLength - titleWidth - 1
+	// Need 2 extra spaces for visual separation between end of subtitle and beginning.
+	r := []rune(item.Subtitle + "  ")
+	s := make([]rune, 0, subtitleSpace)
+	indexStart := 0
+	if m.options.Ticker != nil {
+		indexStart = int(m.options.Ticker.PassedTime().Milliseconds() / 500 % int64(len(r)))
+	}
+	currentWidth := 0
+	for i := indexStart; currentWidth < subtitleSpace; i = (i + 1) % len(r) {
+		s = append(s, r[i])
+		currentWidth += runewidth.RuneWidth(r[i])
+	}
+	// Truncate in case a character of width 2 goes over the limit
+	subtitle := runewidth.Truncate(string(s), subtitleSpace, "")
+	// Fill with space in case we have 1 space remaining but the next rune has width 2
+	subtitle = runewidth.FillRight(subtitle, subtitleSpace)
+	return item.Title + " " + util.SetFgStyle(subtitle, termenv.ANSIBrightBlack)
+}
+
+func (m *Main) formatEntry(item *MenuItem, index int, targetLength int) string {
+	if item == nil {
+		return strings.Repeat(" ", targetLength)
+	}
+	var fmtStart string
+	if !m.inSearching && index == m.selectedIndex {
+		fmtStart = " => "
+	} else {
+		fmtStart = "    "
+	}
+	titleLength := targetLength - m.getMaxIndexWidth() - 6
+	songEntry := fmt.Sprintf(
+		fmt.Sprintf("%s%%%dd. %%s", fmtStart, m.getMaxIndexWidth()),
+		index,
+		m.forceEntryLength(item, titleLength))
+	if m.isSelected(index) {
+		return util.SetFgStyle(songEntry, util.GetPrimaryColor())
+	}
+	return songEntry
+}
+
+func (m *Main) centeredMenuView(a *App, lines int) string {
+	var allSongs []*MenuItem
+	startIndex := m.getPageStartIndex()
+	endIndex := startIndex + lines
+	if m.options.DualColumn {
+		endIndex = startIndex + lines*2
+	}
+	maxSongTitleLength := 0
+	for i := startIndex; i < endIndex; i++ {
+		if i < len(m.menuList) {
+			menuItem := m.menuList[i]
+			length := runewidth.StringWidth(menuItem.OriginString())
+			if length > maxSongTitleLength {
+				maxSongTitleLength = length
+			}
+			allSongs = append(allSongs, &menuItem)
+		} else {
+			allSongs = append(allSongs, nil)
+		}
+	}
+	allSongs = append(allSongs, nil)
+
+	// Songs have 4 spaces built-in at the front, so we need 4 columns on the right side to balance spaces
+	remainingWindowWidth := a.windowWidth - 4
+
+	// Extra padding applied to every segment.
+	// If the window is wide, we want more padding.
+	extraPadding := (a.windowWidth - 40) / 5
+	if extraPadding < 0 {
+		extraPadding = 0
+	}
+	remainingWindowWidth -= extraPadding
+
+	itemMaxLength := remainingWindowWidth / m.getNumColumns()
+
+	entryLength := maxSongTitleLength + 6 + m.getMaxIndexWidth()
+	if entryLength > itemMaxLength {
+		entryLength = itemMaxLength
+	}
+
+	// 4 is the correction
+	paddingLength := a.windowWidth - entryLength*m.getNumColumns() - 4
+	var (
+		leftProportion   = 0.5
+		middleProportion = 0.0
+		// rightProportion  = 0.5
+	)
+	if m.IsDualColumn() {
+		leftProportion = 0.45
+		middleProportion = 0.1
+		// rightProportion = 0.45
+	}
+	paddingLeft := int(math.Round(float64(paddingLength) * leftProportion))
+	paddingLength -= paddingLeft
+	paddingMiddle := int(math.Round(float64(paddingLength) * middleProportion))
+	paddingLength -= paddingMiddle
+	paddingRight := paddingLength + 4
+
+	var result strings.Builder
+	for i := 0; i < lines; i++ {
+		index := i * m.getNumColumns()
+		menuIndex := m.getPageStartIndex() + index
+		result.WriteString(strings.Repeat(" ", paddingLeft))
+		result.WriteString(m.formatEntry(allSongs[index], menuIndex, entryLength))
+		if m.options.DualColumn {
+			result.WriteString(strings.Repeat(" ", paddingMiddle))
+			result.WriteString(m.formatEntry(allSongs[index+1], menuIndex+1, entryLength))
+		}
+		result.WriteString(strings.Repeat(" ", paddingRight))
+		result.WriteString("\n")
+	}
+	return result.String()
 }
 
 func (m *Main) menuListView(a *App, top *int) string {
@@ -373,11 +525,14 @@ func (m *Main) menuListView(a *App, top *int) string {
 		menuListBuilder.WriteString(strings.Repeat("\n", m.menuStartRow-*top))
 	}
 
-	var str string
-	for i := 0; i < lines; i++ {
-		str = m.menuLineView(a, i)
-		menuListBuilder.WriteString(str)
-		menuListBuilder.WriteString("\n")
+	if m.options.CenterEverything {
+		menuListBuilder.WriteString(m.centeredMenuView(a, lines))
+	} else {
+		for i := 0; i < lines; i++ {
+			str := m.menuLineView(a, i)
+			menuListBuilder.WriteString(str)
+			menuListBuilder.WriteString("\n")
+		}
 	}
 
 	// fill blanks
@@ -394,6 +549,10 @@ func (m *Main) menuListView(a *App, top *int) string {
 	return menuListBuilder.String()
 }
 
+func (m *Main) getPageStartIndex() int {
+	return (m.menuCurPage - 1) * m.menuPageSize
+}
+
 func (m *Main) menuLineView(a *App, line int) string {
 	var (
 		menuLineBuilder strings.Builder
@@ -401,9 +560,9 @@ func (m *Main) menuLineView(a *App, line int) string {
 		windowWidth     = a.WindowWidth()
 	)
 	if m.isDualColumn {
-		index = line*2 + (m.menuCurPage-1)*m.menuPageSize
+		index = line*2 + m.getPageStartIndex()
 	} else {
-		index = line + (m.menuCurPage-1)*m.menuPageSize
+		index = line + m.getPageStartIndex()
 	}
 	if index > len(m.menuList)-1 {
 		index = len(m.menuList) - 1
@@ -431,6 +590,14 @@ func (m *Main) menuLineView(a *App, line int) string {
 	return menuLineBuilder.String()
 }
 
+func (m *Main) getMaxIndexWidth() int {
+	return int(math.Log10(float64((m.menuPageSize*m.menuCurPage)-1))) + 1
+}
+
+func (m *Main) isSelected(index int) bool {
+	return !m.inSearching && index == m.selectedIndex
+}
+
 func (m *Main) menuItemView(a *App, index int) (string, int) {
 	var (
 		menuItemBuilder strings.Builder
@@ -438,10 +605,10 @@ func (m *Main) menuItemView(a *App, index int) (string, int) {
 		itemMaxLen      int
 		menuName        string
 		windowWidth     = a.WindowWidth()
-		maxIndexWidth   = int(math.Log10(float64((m.menuPageSize*m.menuCurPage)-1))) + 1
+		maxIndexWidth   = m.getMaxIndexWidth()
 	)
 
-	isSelected := !m.inSearching && index == m.selectedIndex
+	isSelected := m.isSelected(index)
 
 	if isSelected {
 		menuTitle = fmt.Sprintf(fmt.Sprintf(" => %%%dd. %%s", maxIndexWidth), index, m.menuList[index].Title)
@@ -559,7 +726,7 @@ func (m *Main) searchInputView(app *App, top *int) string {
 }
 
 func (m *Main) getCurPageMenus() []MenuItem {
-	start := (m.menuCurPage - 1) * m.menuPageSize
+	start := m.getPageStartIndex()
 	end := int(math.Min(float64(len(m.menuList)), float64(m.menuCurPage*m.menuPageSize)))
 
 	return m.menuList[start:end]
@@ -613,7 +780,7 @@ func (m *Main) keyMsgHandle(msg tea.KeyMsg, a *App) (Page, tea.Cmd) {
 		newPage = m.MoveRight()
 	case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		num, _ := strconv.Atoi(key)
-		start := (m.menuCurPage - 1) * m.menuPageSize
+		start := m.getPageStartIndex()
 		if start+num >= len(m.menuList) {
 			break
 		}
@@ -726,7 +893,7 @@ func (m *Main) MoveUp() Page {
 		}
 		m.selectedIndex--
 	}
-	if m.selectedIndex < (m.menuCurPage-1)*m.menuPageSize {
+	if m.selectedIndex < m.getPageStartIndex() {
 		newPage = m.PrePage()
 	}
 	return newPage
