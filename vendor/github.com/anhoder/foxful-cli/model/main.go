@@ -395,18 +395,23 @@ func (m *Main) forceEntryLength(item *MenuItem, targetLength int) string {
 	// Case 3:
 	// Enough space for main title. Need to scroll subtitle.
 	subtitleSpace := targetLength - titleWidth - 1
-	subtitleWidth := runewidth.StringWidth(item.Subtitle)
-	r := []rune(item.Subtitle)
-	spaceDeficiency := subtitleWidth - subtitleSpace
+	// Need 2 extra spaces for visual separation between end of subtitle and beginning.
+	r := []rune(item.Subtitle + "  ")
 	s := make([]rune, 0, subtitleSpace)
 	indexStart := 0
 	if m.options.Ticker != nil {
-		indexStart = int(m.options.Ticker.PassedTime().Milliseconds() / 500 % int64(spaceDeficiency))
+		indexStart = int(m.options.Ticker.PassedTime().Milliseconds() / 500 % int64(len(r)))
 	}
-	for i := indexStart; i < indexStart+subtitleSpace && i < len(r); i++ {
+	currentWidth := 0
+	for i := indexStart; currentWidth < subtitleSpace; i = (i + 1) % len(r) {
 		s = append(s, r[i])
+		currentWidth += runewidth.RuneWidth(r[i])
 	}
-	return item.Title + " " + util.SetFgStyle(runewidth.Truncate(string(s), subtitleSpace, ""), termenv.ANSIBrightBlack)
+	// Truncate in case a character of width 2 goes over the limit
+	subtitle := runewidth.Truncate(string(s), subtitleSpace, "")
+	// Fill with space in case we have 1 space remaining but the next rune has width 2
+	subtitle = runewidth.FillRight(subtitle, subtitleSpace)
+	return item.Title + " " + util.SetFgStyle(subtitle, termenv.ANSIBrightBlack)
 }
 
 func (m *Main) formatEntry(item *MenuItem, index int, targetLength int) string {
@@ -472,13 +477,20 @@ func (m *Main) centeredMenuView(a *App, lines int) string {
 
 	// 4 is the correction
 	paddingLength := a.windowWidth - entryLength*m.getNumColumns() - 4
-	paddingLeft := paddingLength / (m.getNumColumns() + 1)
-	paddingLength -= paddingLeft
-	paddingMiddle := 0
-	if m.options.DualColumn {
-		paddingMiddle = paddingLength / 2
-		paddingLength -= paddingMiddle
+	var (
+		leftProportion   = 0.5
+		middleProportion = 0.0
+		// rightProportion  = 0.5
+	)
+	if m.IsDualColumn() {
+		leftProportion = 0.45
+		middleProportion = 0.1
+		// rightProportion = 0.45
 	}
+	paddingLeft := int(math.Round(float64(paddingLength) * leftProportion))
+	paddingLength -= paddingLeft
+	paddingMiddle := int(math.Round(float64(paddingLength) * middleProportion))
+	paddingLength -= paddingMiddle
 	paddingRight := paddingLength + 4
 
 	var result strings.Builder
