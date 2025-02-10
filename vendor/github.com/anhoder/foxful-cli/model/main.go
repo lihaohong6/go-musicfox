@@ -126,15 +126,11 @@ func (m *Main) Update(msg tea.Msg, a *App) (Page, tea.Cmd) {
 		}
 
 		if m.options.DynamicRowCount {
-			numColumns := 1
-			if m.isDualColumn {
-				numColumns = 2
-			}
 			// Compute the maximum number of entries per page based on the number of rows remaining.
 			// 13 is the magic number that works best.
 			// 3 lines for search + 5 lines of lyrics + 6 lines of song name and progress bar = 14. Not
 			// sure where the discrepancy comes from.
-			maxEntries := (msg.Height - m.menuStartRow - 13) * numColumns
+			maxEntries := (msg.Height - m.menuStartRow - 13) * m.getNumColumns()
 			if maxEntries > 10 {
 				m.menuPageSize = maxEntries
 			} else {
@@ -371,7 +367,7 @@ func (m *Main) MenuList() []MenuItem {
 }
 
 func (m *Main) getNumColumns() int {
-	if m.options.DualColumn {
+	if m.isDualColumn {
 		return 2
 	}
 	return 1
@@ -439,7 +435,7 @@ func (m *Main) centeredMenuView(a *App, lines int) string {
 	var allSongs []*MenuItem
 	startIndex := m.getPageStartIndex()
 	endIndex := startIndex + lines
-	if m.options.DualColumn {
+	if m.isDualColumn {
 		endIndex = startIndex + lines*2
 	}
 	maxSongTitleLength := 0
@@ -499,7 +495,7 @@ func (m *Main) centeredMenuView(a *App, lines int) string {
 		menuIndex := m.getPageStartIndex() + index
 		result.WriteString(strings.Repeat(" ", paddingLeft))
 		result.WriteString(m.formatEntry(allSongs[index], menuIndex, entryLength))
-		if m.options.DualColumn {
+		if m.isDualColumn {
 			result.WriteString(strings.Repeat(" ", paddingMiddle))
 			result.WriteString(m.formatEntry(allSongs[index+1], menuIndex+1, entryLength))
 		}
