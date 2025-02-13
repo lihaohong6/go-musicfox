@@ -17,6 +17,7 @@ type Options struct {
 	PrimaryColor        string
 	DualColumn          bool // The menu list is displayed as a dual column
 	DynamicRowCount     bool // If true, the number of entries per page can be greater than 10
+	MaxMenuStartRow     int // Max number of rows occupied by the title section before the menu. Works only when DynamicRowCount is on.
 	CenterEverything    bool // If true, everything will be centered. Otherwise, use default layout.
 	HideMenu            bool
 
@@ -67,6 +68,7 @@ func DefaultOptions() *Options {
 		WhetherDisplayTitle: true,
 		DualColumn:          true,
 		DynamicRowCount:     false,
+		MaxMenuStartRow:     0,
 		CenterEverything:    true,
 		AppName:             util.PkgName,
 		LoadingText:         util.LoadingText,
