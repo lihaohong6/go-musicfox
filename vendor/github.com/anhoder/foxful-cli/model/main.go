@@ -286,15 +286,14 @@ func (m *Main) TitleView(a *App, top *int) string {
 		titleBuilder strings.Builder
 		windowWidth  = a.WindowWidth()
 	)
-	titleLen := runewidth.StringWidth(m.options.AppName)
+	appName := " " + m.options.AppName + " "
+	titleLen := runewidth.StringWidth(appName)
 	prefixLen := (windowWidth - titleLen) / 2
 	suffixLen := windowWidth - prefixLen - titleLen
 	if prefixLen > 0 {
 		titleBuilder.WriteString(strings.Repeat("─", prefixLen))
 	}
-	titleBuilder.WriteString(" ")
-	titleBuilder.WriteString(m.options.AppName)
-	titleBuilder.WriteString(" ")
+	titleBuilder.WriteString(appName)
 	if suffixLen > 0 {
 		titleBuilder.WriteString(strings.Repeat("─", suffixLen))
 	}
