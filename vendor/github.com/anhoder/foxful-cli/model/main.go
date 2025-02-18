@@ -8,6 +8,7 @@ import (
 	"github.com/mattn/go-runewidth"
 	"github.com/muesli/termenv"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -443,20 +444,31 @@ func (m *Main) centeredMenuView(a *App, lines int) string {
 	if m.isDualColumn {
 		endIndex = startIndex + lines*2
 	}
-	maxSongTitleLength := 0
+	var titleLengths []int
 	for i := startIndex; i < endIndex; i++ {
 		if i < len(m.menuList) {
 			menuItem := m.menuList[i]
 			length := runewidth.StringWidth(menuItem.OriginString())
-			if length > maxSongTitleLength {
-				maxSongTitleLength = length
-			}
+			titleLengths = append(titleLengths, length)
 			allSongs = append(allSongs, &menuItem)
 		} else {
 			allSongs = append(allSongs, nil)
 		}
 	}
 	allSongs = append(allSongs, nil)
+
+	slices.Sort(titleLengths)
+	maxSongTitleLength := 0
+	if len(titleLengths) > 0 {
+		maxSongTitleLength = titleLengths[len(titleLengths)-1]
+	}
+	if len(titleLengths) >= 6 && maxSongTitleLength >= 30 {
+		// Drop the longest titles to prevent the menu from being stretched too long due to outliers
+		maxSongTitleLength = titleLengths[len(titleLengths)-3]
+		if maxSongTitleLength < 30 {
+			maxSongTitleLength = 30
+		}
+	}
 
 	// Songs have 4 spaces built-in at the front, so we need 4 columns on the right side to balance spaces
 	remainingWindowWidth := a.windowWidth - 4
