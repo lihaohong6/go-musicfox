@@ -117,9 +117,18 @@ func (m *Main) Update(msg tea.Msg, a *App) (Page, tea.Cmd) {
 
 		// menu start col, row
 		m.menuStartRow = msg.Height / 3
-		// If dynamic row count is on, we want at most 10 rows at the start to give more space to the entries
-		if m.options.DynamicRowCount && m.menuStartRow > 10 {
-			m.menuStartRow = 10
+		// Height of the bottom part of the music player. Used in calculating the number of rows left.
+		// 3 lines for search + 5 lines of lyrics + 6 lines of song name and progress bar = 14. But somehow
+		// 13 works better.
+		bottomHeight := 13
+		// If dynamic row count is on, we may want to adjust menuStartRow
+		if m.options.DynamicRowCount {
+			if m.options.MaxMenuStartRow > 0 {
+				// Limit menuStartRow to user-defined value
+				if m.menuStartRow > m.options.MaxMenuStartRow {
+					m.menuStartRow = m.options.MaxMenuStartRow
+				}
+			}
 		}
 
 		if !m.options.WhetherDisplayTitle && m.menuStartRow > 1 {
@@ -127,11 +136,7 @@ func (m *Main) Update(msg tea.Msg, a *App) (Page, tea.Cmd) {
 		}
 
 		if m.options.DynamicRowCount {
-			// Compute the maximum number of entries per page based on the number of rows remaining.
-			// 13 is the magic number that works best.
-			// 3 lines for search + 5 lines of lyrics + 6 lines of song name and progress bar = 14. Not
-			// sure where the discrepancy comes from.
-			maxEntries := (msg.Height - m.menuStartRow - 13) * m.getNumColumns()
+			maxEntries := (msg.Height - m.menuStartRow - bottomHeight) * m.getNumColumns()
 			if maxEntries > 10 {
 				m.menuPageSize = maxEntries
 			} else {
@@ -457,8 +462,8 @@ func (m *Main) centeredMenuView(a *App, lines int) string {
 		maxSongTitleLength = titleLengths[len(titleLengths)-1]
 	}
 	if len(titleLengths) >= 6 && maxSongTitleLength >= 30 {
-		// Drop the longest titles to prevent the menu from being stretched too long due to outliers
-		maxSongTitleLength = titleLengths[len(titleLengths)-3]
+		// Drop the longest 30% of all titles to prevent the menu from being stretched too long due to outliers
+		maxSongTitleLength = titleLengths[int32(0.7*float32(len(titleLengths)))]
 		if maxSongTitleLength < 30 {
 			maxSongTitleLength = 30
 		}
@@ -518,6 +523,9 @@ func (m *Main) centeredMenuView(a *App, lines int) string {
 
 func (m *Main) menuListView(a *App, top *int) string {
 	var menuListBuilder strings.Builder
+	if m.options.DynamicRowCount {
+		m.menuCurPage = m.selectedIndex/m.menuPageSize + 1
+	}
 	menus := m.getCurPageMenus()
 	var lines, maxLines int
 	if m.isDualColumn {

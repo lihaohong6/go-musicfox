@@ -1,4 +1,4 @@
-# github.com/anhoder/foxful-cli v0.4.2
+# github.com/anhoder/foxful-cli v0.4.2 => github.com/lihaohong6/foxful-cli v0.0.0-20250303185254-e8c29a155a9a
 ## explicit; go 1.20
 github.com/anhoder/foxful-cli/model
 github.com/anhoder/foxful-cli/util
@@ -351,6 +351,7 @@ golang.org/x/text/runes
 golang.org/x/text/transform
 golang.org/x/text/unicode/norm
 golang.org/x/text/width
+# github.com/anhoder/foxful-cli => github.com/lihaohong6/foxful-cli v0.0.0-20250303185254-e8c29a155a9a
 # github.com/cnsilvan/UnblockNeteaseMusic => github.com/go-musicfox/UnblockNeteaseMusic v0.1.6
 # github.com/saltosystems/winrt-go => github.com/go-musicfox/winrt-go v0.1.4
 # github.com/shkh/lastfm-go => github.com/go-musicfox/lastfm-go v0.0.2
