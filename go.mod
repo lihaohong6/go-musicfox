@@ -36,6 +36,8 @@ require (
 	golang.org/x/sys v0.30.0
 )
 
+replace github.com/anhoder/foxful-cli => github.com/lihaohong6/foxful-cli v0.0.0-20250303185254-e8c29a155a9a
+
 require (
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect

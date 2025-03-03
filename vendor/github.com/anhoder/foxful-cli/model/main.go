@@ -128,7 +128,7 @@ func (m *Main) Update(msg tea.Msg, a *App) (Page, tea.Cmd) {
 				if m.menuStartRow > m.options.MaxMenuStartRow {
 					m.menuStartRow = m.options.MaxMenuStartRow
 				}
-			}	
+			}
 		}
 
 		if !m.options.WhetherDisplayTitle && m.menuStartRow > 1 {
@@ -136,7 +136,6 @@ func (m *Main) Update(msg tea.Msg, a *App) (Page, tea.Cmd) {
 		}
 
 		if m.options.DynamicRowCount {
-			// Compute the maximum number of entries per page based on the number of rows remaining.
 			maxEntries := (msg.Height - m.menuStartRow - bottomHeight) * m.getNumColumns()
 			if maxEntries > 10 {
 				m.menuPageSize = maxEntries
@@ -463,8 +462,8 @@ func (m *Main) centeredMenuView(a *App, lines int) string {
 		maxSongTitleLength = titleLengths[len(titleLengths)-1]
 	}
 	if len(titleLengths) >= 6 && maxSongTitleLength >= 30 {
-		// Drop the longest titles to prevent the menu from being stretched too long due to outliers
-		maxSongTitleLength = titleLengths[len(titleLengths)-3]
+		// Drop the longest 30% of all titles to prevent the menu from being stretched too long due to outliers
+		maxSongTitleLength = titleLengths[int32(0.7*float32(len(titleLengths)))]
 		if maxSongTitleLength < 30 {
 			maxSongTitleLength = 30
 		}
