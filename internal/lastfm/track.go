@@ -16,19 +16,21 @@ type Tracker struct {
 	client *Client
 	l      sync.Mutex
 
-	enable        bool                  // 是否启用，功能不可用时为本地模式
-	scrobblePoint int                   // 可 Scrobble 百分比
-	pending       *storage.ScrobbleList // 待上报项
-	nowPlaying    storage.Scrobble      // 当前播放
-	runonce       chan bool             // 用于触发一次执行
+	enable          bool // 是否启用，功能不可用时为本地模式
+	scrobblePoint   int  // 可 Scrobble 百分比
+	onlyFirstArtist bool
+	pending         *storage.ScrobbleList // 待上报项
+	nowPlaying      storage.Scrobble      // 当前播放
+	runonce         chan bool             // 用于触发一次执行
 }
 
 func NewTracker(client *Client, ctx context.Context) *Tracker {
 	t := &Tracker{
-		client:  client,
-		enable:  configs.ConfigRegistry.Lastfm.Enable,
-		pending: &storage.ScrobbleList{},
-		runonce: make(chan bool, 1),
+		client:          client,
+		enable:          configs.ConfigRegistry.Lastfm.Enable,
+		onlyFirstArtist: configs.ConfigRegistry.Lastfm.OnlyFirstArtist,
+		pending:         &storage.ScrobbleList{},
+		runonce:         make(chan bool, 1),
 	}
 	t.setScrobblePoint(configs.ConfigRegistry.Lastfm.ScrobblePoint)
 	t.pending.InitFromStorage()
@@ -114,11 +116,17 @@ func (t *Tracker) Scrobble(scrobble storage.Scrobble) {
 	}
 	t.l.Lock()
 	defer t.l.Unlock()
+	if t.onlyFirstArtist {
+		scrobble.FilterArtist()
+	}
 	t.pending.Add(scrobble)
 	t.runOnce()
 }
 
 func (t *Tracker) Playing(scrobble storage.Scrobble) {
+	if t.onlyFirstArtist {
+		scrobble.FilterArtist()
+	}
 	t.nowPlaying = scrobble
 	if t.client.NeedAuth() || !t.Status() {
 		return
