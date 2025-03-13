@@ -206,3 +206,7 @@ func (t *Tracker) IsScrobbleExpired(scrobble storage.Scrobble) bool {
 	fourteenDaysAgo := time.Now().AddDate(0, 0, -int(scrobbleExpiryDays)).Unix()
 	return scrobble.Timestamp < fourteenDaysAgo
 }
+
+func (m *Tracker) Count() int {
+	return len(m.pending.Scrobbles)
+}
